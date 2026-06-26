@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux File Permissions // ximer.dev</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:        #0A0F1E;
+    --bg2:       #0F1628;
+    --bg3:       #141C35;
+    --border:    #1E2A4A;
+    --border2:   #263354;
+    --cyan:      #00D4FF;
+    --cyan-dim:  #00D4FF22;
+    --cyan-mid:  #00D4FF55;
+    --green:     #00FF94;
+    --green-dim: #00FF9422;
+    --amber:     #FFB800;
+    --amber-dim: #FFB80022;
+    --red:       #FF4D6A;
+    --red-dim:   #FF4D6A22;
+    --text:      #C8D8F0;
+    --text-muted:#5A7099;
+    --text-dim:  #3A5070;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Inter', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 28px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+  .logo span { color: var(--cyan); }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--cyan);
+    border: 1px solid var(--cyan-mid);
+    padding: 4px 10px;
+    border-radius: 3px;
+    background: var(--cyan-dim);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 64px 0 48px;
+    text-align: center;
+  }
+
+  .hero-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .hero-title {
+    font-family: var(--mono);
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .hero-title .accent { color: var(--cyan); }
+
+  /* Signature element: typewriter permission string */
+  .typewriter-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    font-family: var(--mono);
+    font-size: clamp(20px, 4vw, 32px);
+    font-weight: 700;
+    margin: 28px 0;
+    padding: 16px 28px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    letter-spacing: 4px;
+    min-height: 70px;
+    position: relative;
+  }
+  .typewriter-wrap::before {
+    content: '$ stat';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px 6px 0 0;
+    padding: 4px 12px;
+    letter-spacing: 0.05em;
+  }
+  .typewriter-wrap { padding-top: 38px; }
+
+  .tw-char { transition: color 0.1s; }
+  .tw-type  { color: #A78BFA; }
+  .tw-owner { color: var(--cyan); }
+  .tw-group { color: var(--green); }
+  .tw-other { color: var(--amber); }
+  .tw-dash  { color: var(--text-dim); }
+
+  .cursor {
+    display: inline-block;
+    width: 2px; height: 1.1em;
+    background: var(--cyan);
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .hero-desc {
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ── SECTION LABELS ── */
+  .section { padding: 48px 0; border-top: 1px solid var(--border); }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--cyan);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── ANATOMY ── */
+  .anatomy-display {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 32px 24px 20px;
+    position: relative;
+    overflow: visible;
+  }
+  .anatomy-display::before {
+    content: 'permissions string';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    font-size: 11px; font-family: var(--mono);
+    color: var(--text-dim);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    padding: 6px 14px;
+    letter-spacing: 0.05em;
+  }
+
+  .char-row {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .gap { width: 8px; }
+
+  .char-box {
+    width: 44px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+    border-radius: 5px; cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform 0.12s, box-shadow 0.12s;
+    position: relative;
+  }
+  .char-box:hover { transform: translateY(-2px); }
+  .char-box.active { box-shadow: 0 0 0 2px currentColor; transform: translateY(-2px); }
+
+  .char-box.ct { background: #1a1040; color: #A78BFA; border-color: #3d2a7a; }
+  .char-box.co { background: #001e2e; color: var(--cyan); border-color: #003f5c; }
+  .char-box.cg { background: #001e14; color: var(--green); border-color: #00573a; }
+  .char-box.ca { background: #1e1600; color: var(--amber); border-color: #574200; }
+  .char-box.dash { opacity: 0.35; }
+
+  .legend-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .leg {
+    border-radius: 5px; padding: 10px 12px;
+    border: 1px solid;
+    font-size: 12px;
+  }
+  .leg-title { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .leg-desc  { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+  .leg.lt { background: #1a1040; border-color: #3d2a7a; } .leg.lt .leg-title { color: #A78BFA; }
+  .leg.lo { background: #001e2e; border-color: #003f5c; } .leg.lo .leg-title { color: var(--cyan); }
+  .leg.lg { background: #001e14; border-color: #00573a; } .leg.lg .leg-title { color: var(--green); }
+  .leg.la { background: #1e1600; border-color: #574200; } .leg.la .leg-title { color: var(--amber); }
+
+  .tip-box {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 13px;
+    min-height: 60px;
+    transition: border-color 0.2s;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+  .tip-box .tip-head { color: var(--cyan); font-size: 11px; letter-spacing: 0.1em; margin-bottom: 6px; text-transform: uppercase; }
+  .tip-box .tip-body { color: var(--text-muted); font-size: 13px; line-height: 1.6; font-family: var(--sans); }
+  .tip-box .tip-body b { color: var(--text); font-family: var(--mono); font-weight: 500; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+  .tab-btn {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em;
+    padding: 10px 18px; background: none; border: none; cursor: pointer;
+    color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+  .tab-panel { display: none; padding-top: 24px; }
+  .tab-panel.active { display: block; }
+
+  /* ── BUILDER ── */
+  .builder-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .builder-col {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .col-head {
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-head.co { color: var(--cyan); }
+  .col-head.cg { color: var(--green); }
+  .col-head.ca { color: var(--amber); }
+
+  .chk-label {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 13px;
+    cursor: pointer; padding: 5px 0;
+    color: var(--text-muted);
+    transition: color 0.1s;
+    user-select: none;
+  }
+  .chk-label:hover { color: var(--text); }
+  .chk-label input[type=checkbox] { display: none; }
+  .chk-box {
+    width: 16px; height: 16px;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    background: var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.1s;
+    font-size: 10px;
+  }
+  .chk-label input:checked ~ .chk-box {
+    background: var(--cyan-dim); border-color: var(--cyan);
+    color: var(--cyan);
+  }
+  .chk-label input:checked ~ span { color: var(--text); }
+
+  .builder-result {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 20px 20px 16px;
+  }
+  .res-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .res-string { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: 3px; margin-bottom: 12px; color: #fff; }
+  .cmd-line {
+    font-family: var(--mono); font-size: 14px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 4px; padding: 10px 14px;
+    color: var(--green);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cmd-line .prompt { color: var(--text-dim); }
+  .copy-btn {
+    margin-left: auto;
+    background: none; border: 1px solid var(--border2);
+    color: var(--text-muted); font-family: var(--mono); font-size: 11px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer;
+    transition: all 0.15s; letter-spacing: 0.05em;
+  }
+  .copy-btn:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+
+  /* ── EXAMPLES TABLE ── */
+  .ex-table { width: 100%; border-collapse: collapse; }
+  .ex-table thead tr { border-bottom: 1px solid var(--border2); }
+  .ex-table th {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-dim);
+    padding: 0 12px 10px; text-align: left;
+  }
+  .ex-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
+  .ex-table tr:last-child td { border-bottom: none; }
+  .ex-table tr:hover td { background: var(--bg2); }
+  .mono-cell { font-family: var(--mono); font-size: 14px; letter-spacing: 1px; color: #fff; }
+  .oct-cell  { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--amber); }
+  .desc-cell { color: var(--text-muted); font-size: 12px; }
+  .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+    padding: 2px 7px; border-radius: 3px; white-space: nowrap;
+  }
+  .tag.danger { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+  .tag.ok     { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+  .tag.info   { background: var(--cyan-dim); color: var(--cyan); border: 1px solid var(--cyan); }
+  .load-btn {
+    font-family: var(--mono); font-size: 11px;
+    background: none; border: 1px solid var(--border2);
+    color: var(--text-dim); padding: 4px 10px; border-radius: 3px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .load-btn:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+
+  /* ── OCTAL CONVERTER ── */
+  .octal-section { padding: 48px 0; border-top: 1px solid var(--border); }
+  .octal-grid { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px; }
+  .octal-card {
+    flex: 1; min-width: 140px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px;
+    text-align: center;
+  }
+  .octal-card .oc-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; }
+  .octal-card input[type=number] {
+    width: 72px; height: 64px;
+    font-family: var(--mono); font-size: 32px; font-weight: 700;
+    text-align: center; background: var(--bg3);
+    border: 1px solid var(--border2); border-radius: 5px;
+    color: #fff; outline: none; margin-bottom: 8px;
+    -moz-appearance: textfield;
+  }
+  .octal-card input::-webkit-outer-spin-button,
+  .octal-card input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .octal-card input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan-dim); }
+  .octal-card .oc-bits { font-family: var(--mono); font-size: 13px; min-height: 20px; margin-bottom: 4px; }
+  .octal-card .oc-sum  { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .oc-owner input:focus { border-color: var(--cyan); }
+  .oc-group input:focus { border-color: var(--green); }
+  .oc-other input:focus { border-color: var(--amber); }
+  .oc-owner .oc-bits { color: var(--cyan); }
+  .oc-group .oc-bits { color: var(--green); }
+  .oc-other .oc-bits { color: var(--amber); }
+
+  .octal-result-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 16px 20px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .arrow-sep { color: var(--text-dim); font-family: var(--mono); font-size: 18px; }
+  .octal-result-string { font-family: var(--mono); font-size: 24px; font-weight: 700; letter-spacing: 3px; color: #fff; }
+
+  /* ── CHEATSHEET ── */
+  .cheat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .cheat-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px;
+  }
+  .cheat-card .cc-val { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--cyan); margin-bottom: 4px; }
+  .cheat-card .cc-name { font-size: 13px; font-weight: 500; color: #fff; margin-bottom: 4px; }
+  .cheat-card .cc-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px 0 40px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+  }
+  footer .fl { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  footer .fl a { color: var(--cyan); text-decoration: none; }
+  footer .fl a:hover { text-decoration: underline; }
+  .gh-link {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em;
+    color: var(--cyan); border: 1px solid var(--cyan-mid);
+    padding: 6px 14px; border-radius: 4px; background: var(--cyan-dim);
+    text-decoration: none; transition: all 0.15s;
+  }
+  .gh-link:hover { background: #00D4FF33; box-shadow: 0 0 12px var(--cyan-dim); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .legend-row { grid-template-columns: 1fr 1fr; }
+    .builder-grid { grid-template-columns: 1fr; }
+    .octal-grid { gap: 10px; }
+    .char-box { width: 34px; height: 40px; font-size: 17px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cursor { animation: none; opacity: 1; }
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">// <span>linux permissions</span> — interactive reference</div>
+    <div class="badge">v1.0 · ximer.dev</div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-label">// security fundamentals</div>
+    <h1 class="hero-title">File <span class="accent">Permissions</span><br>Decoded</h1>
+    <div class="typewriter-wrap">
+      <span id="tw"></span><span class="cursor" id="cur"></span>
+    </div>
+    <p class="hero-desc">Розберись раз і назавжди — що означає кожен символ у правах доступу Linux і як ними керувати.</p>
+  </section>
+
+  <!-- ANATOMY -->
+  <section class="section">
+    <div class="section-label">01 // структура рядка</div>
+
+    <div class="anatomy-display">
+      <div class="char-row" id="char-row">
+        <!-- injected by JS -->
+      </div>
+      <div class="legend-row">
+        <div class="leg lt"><div class="leg-title">тип (1)</div><div class="leg-desc">- файл / d папка / l symlink</div></div>
+        <div class="leg lo"><div class="leg-title">власник (3)</div><div class="leg-desc">user — твій акаунт</div></div>
+        <div class="leg lg"><div class="leg-title">група (3)</div><div class="leg-desc">users у тій самій групі</div></div>
+        <div class="leg la"><div class="leg-title">інші (3)</div><div class="leg-desc">всі решта в системі</div></div>
+      </div>
+    </div>
+
+    <div class="tip-box" id="tip-box">
+      <div class="tip-head">// підказка</div>
+      <div class="tip-body" id="tip-body">Натисни на будь-який символ вище, щоб побачити що він означає.</div>
+    </div>
+  </section>
+
+  <!-- BUILDER + EXAMPLES -->
+  <section class="section">
+    <div class="section-label">02 // конструктор прав</div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('builder',this)">builder</button>
+      <button class="tab-btn" onclick="switchTab('examples',this)">examples</button>
+      <button class="tab-btn" onclick="switchTab('cheat',this)">cheatsheet</button>
+    </div>
+
+    <!-- BUILDER -->
+    <div class="tab-panel active" id="tp-builder">
+      <div class="builder-grid">
+        <div class="builder-col">
+          <div class="col-head co">// owner (u)</div>
+          <label class="chk-label"><input type="checkbox" id="ur" checked onchange="buildPerm()"><span class="chk-box">✓</span><span>r — read</span></label>
+          <label class="chk-label"><input type="checkbox" id="uw" checked onchange="buildPerm()"><span class="chk-box">✓</span><span>w — write</span></label>
+          <label class="chk-label"><input type="checkbox" id="ux" onchange="buildPerm()"><span class="chk-box"></span><span>x — execute</span></label>
+        </div>
+        <div class="builder-col">
+          <div class="col-head cg">// group (g)</div>
+          <label class="chk-label"><input type="checkbox" id="gr" checked onchange="buildPerm()"><span class="chk-box">✓</span><span>r — read</span></label>
+          <label class="chk-label"><input type="checkbox" id="gw" onchange="buildPerm()"><span class="chk-box"></span><span>w — write</span></label>
+          <label class="chk-label"><input type="checkbox" id="gx" onchange="buildPerm()"><span class="chk-box"></span><span>x — execute</span></label>
+        </div>
+        <div class="builder-col">
+          <div class="col-head ca">// other (o)</div>
+          <label class="chk-label"><input type="checkbox" id="or" checked onchange="buildPerm()"><span class="chk-box">✓</span><span>r — read</span></label>
+          <label class="chk-label"><input type="checkbox" id="ow" onchange="buildPerm()"><span class="chk-box"></span><span>w — write</span></label>
+          <label class="chk-label"><input type="checkbox" id="ox" onchange="buildPerm()"><span class="chk-box"></span><span>x — execute</span></label>
+        </div>
+      </div>
+      <div class="builder-result">
+        <div class="res-label">// output</div>
+        <div class="res-string" id="b-str">-rw-r--r--</div>
+        <div class="cmd-line">
+          <span class="prompt">$</span>
+          <span id="b-cmd">chmod 644 &lt;file&gt;</span>
+          <button class="copy-btn" onclick="copyCmd()">copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXAMPLES -->
+    <div class="tab-panel" id="tp-examples">
+      <table class="ex-table">
+        <thead><tr>
+          <th>permissions</th><th>chmod</th><th>опис</th><th>тег</th><th></th>
+        </tr></thead>
+        <tbody id="ex-body"></tbody>
+      </table>
+    </div>
+
+    <!-- CHEATSHEET -->
+    <div class="tab-panel" id="tp-cheat">
+      <div class="cheat-grid" id="cheat-grid"></div>
+    </div>
+  </section>
+
+  <!-- OCTAL CONVERTER -->
+  <section class="octal-section">
+    <div class="section-label">03 // octal converter</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">r=4 · w=2 · x=1 · складаємо три цифри для власника, групи та інших</p>
+
+    <div class="octal-grid">
+      <div class="octal-card oc-owner">
+        <div class="oc-label">owner</div>
+        <input type="number" id="n1" min="0" max="7" value="6" oninput="calcOctal()">
+        <div class="oc-bits" id="ob1">rw-</div>
+        <div class="oc-sum" id="os1">4+2</div>
+      </div>
+      <div class="octal-card oc-group">
+        <div class="oc-label">group</div>
+        <input type="number" id="n2" min="0" max="7" value="4" oninput="calcOctal()">
+        <div class="oc-bits" id="ob2">r--</div>
+        <div class="oc-sum" id="os2">4</div>
+      </div>
+      <div class="octal-card oc-other">
+        <div class="oc-label">other</div>
+        <input type="number" id="n3" min="0" max="7" value="4" oninput="calcOctal()">
+        <div class="oc-bits" id="ob3">r--</div>
+        <div class="oc-sum" id="os3">4</div>
+      </div>
+    </div>
+
+    <div class="octal-result-row">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--text-dim);">chmod</span>
+      <span style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--amber)" id="oct-num">644</span>
+      <span class="arrow-sep">→</span>
+      <span class="octal-result-string" id="oct-str">-rw-r--r--</span>
+      <div class="cmd-line" style="flex:1;min-width:160px;margin-left:auto;">
+        <span class="prompt">$</span>
+        <span id="oct-cmd">chmod 644 &lt;file&gt;</span>
+        <button class="copy-btn" onclick="copyOctal()">copy</button>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /wrap -->
+
+<footer class="wrap">
+  <div class="fl">// made by <a href="https://github.com/Ximer8" target="_blank">@ximer8</a> · linux permissions reference</div>
+  <a href="https://github.com/Ximer8" class="gh-link" target="_blank">github ↗</a>
+</footer>
+
+<script>
+/* ── DATA ── */
+const TIPS = [
+  { head:'тип файлу', body:'<b>-</b> звичайний файл<br><b>d</b> директорія (папка)<br><b>l</b> символічне посилання (symlink)<br><b>c/b</b> пристрій (device)', color:'#A78BFA' },
+  { head:'read — власник', body:'<b>r</b> можна відкрити і прочитати вміст файлу.<br>Для папки: можна побачити список файлів (ls).', color:'var(--cyan)' },
+  { head:'write — власник', body:'<b>w</b> можна змінювати, дописувати, видаляти файл.<br>Для папки: можна створювати або видаляти файли всередині.', color:'var(--cyan)' },
+  { head:'execute — власник', body:'<b>x</b> можна запустити як програму або скрипт.<br>Для папки: можна зайти в неї (cd) і звертатись до файлів.', color:'var(--cyan)' },
+  { head:'read — група', body:'Те саме що для власника, але стосується всіх членів групи, до якої належить файл.', color:'var(--green)' },
+  { head:'write — група', body:'Члени групи можуть редагувати файл.<br><b>-</b> означає що група не може писати.', color:'var(--green)' },
+  { head:'execute — група', body:'Члени групи можуть запускати файл або заходити в папку.', color:'var(--green)' },
+  { head:'read — інші', body:'«Інші» — всі користувачі системи, які не є власником і не входять до групи.', color:'var(--amber)' },
+  { head:'write — інші', body:'Якщо тут <b>w</b> — будь-хто в системі може редагувати файл.<br>Зазвичай це небезпечно!', color:'var(--amber)' },
+  { head:'execute — інші', body:'Якщо тут <b>x</b> — будь-хто може запустити цей файл.', color:'var(--amber)' },
+];
+const CLASSES = ['ct','co','co','co','cg','cg','cg','ca','ca','ca'];
+const PERM_DEFAULT = '-rw-r--r--';
+
+const EXAMPLES = [
+  { p:'-rw-r--r--', oct:'644', desc:'Звичайний файл: власник читає+пише, решта тільки читають', tag:'ok', tl:'standard' },
+  { p:'-r--------', oct:'400', desc:'Тільки власник читає. Нікого більше. Обов\'язково для SSH-ключів!', tag:'info', tl:'ssh key' },
+  { p:'-rwxr-xr-x', oct:'755', desc:'Виконуваний файл: власник усе, решта — читати та запускати', tag:'ok', tl:'executable' },
+  { p:'-rwx------', oct:'700', desc:'Тільки власник має повний доступ, для інших нічого', tag:'ok', tl:'private' },
+  { p:'-rw-rw-r--', oct:'664', desc:'Власник і група можуть редагувати, інші тільки читають', tag:'info', tl:'shared edit' },
+  { p:'-rw-------', oct:'600', desc:'Тільки власник читає і пише, нікого більше', tag:'info', tl:'private file' },
+  { p:'-rwxrwxrwx', oct:'777', desc:'Усі можуть усе. Небезпечно для продакшн-файлів!', tag:'danger', tl:'⚠ dangerous' },
+  { p:'drwxr-xr-x', oct:'755', desc:'Звичайна папка: власник повний контроль, решта можуть заходити', tag:'ok', tl:'directory' },
+  { p:'drwx------', oct:'700', desc:'Приватна папка: тільки власник може зайти і щось змінити', tag:'ok', tl:'private dir' },
+];
+
+const CHEAT = [
+  { v:'chmod 400', n:'Read-only (owner)', d:'SSH ключі. Стандарт безпеки — ніхто крім тебе не читає.' },
+  { v:'chmod 600', n:'Private file', d:'Конфіги з паролями, .env файли. Читає і пише тільки власник.' },
+  { v:'chmod 644', n:'Public file', d:'Веб-файли, документи. Власник пише, всі читають.' },
+  { v:'chmod 700', n:'Private dir/exec', d:'Особисті скрипти та папки. Повний контроль тільки для власника.' },
+  { v:'chmod 755', n:'Public executable', d:'Виконувані файли та веб-папки. Всі можуть читати і запускати.' },
+  { v:'chmod 777', n:'⚠ World writable', d:'Всі можуть все. Ніколи не використовуй на продакшні.' },
+  { v:'chmod +x', n:'Add execute bit', d:'Зробити файл виконуваним для всіх без зміни решти прав.' },
+  { v:'chmod go-r', n:'Remove read (g+o)', d:'Прибрати читання у групи та інших залишивши власника.' },
+];
+
+/* ── TYPEWRITER ── */
+let twStr = PERM_DEFAULT;
+function getClass(i) {
+  if(i===0) return 'tw-type';
+  if(i<=3) return 'tw-owner';
+  if(i<=6) return 'tw-group';
+  return 'tw-other';
+}
+function renderTW(str) {
+  const el = document.getElementById('tw');
+  el.innerHTML = str.split('').map((c,i) =>
+    `<span class="tw-char ${getClass(i)}${c==='-'?' tw-dash':''}">${c}</span>`
+  ).join('');
+}
+function typewriterAnimate() {
+  const el = document.getElementById('tw');
+  const cur = document.getElementById('cur');
+  el.innerHTML = '';
+  let i = 0;
+  const t = setInterval(() => {
+    if(i >= twStr.length) { clearInterval(t); cur.style.display='inline-block'; return; }
+    el.innerHTML += `<span class="tw-char ${getClass(i)}${twStr[i]==='-'?' tw-dash':''}">${twStr[i]}</span>`;
+    i++;
+  }, 90);
+}
+
+/* ── ANATOMY CHARS ── */
+let activeChar = null;
+function buildCharRow(str) {
+  const row = document.getElementById('char-row');
+  row.innerHTML = '';
+  str.split('').forEach((ch, i) => {
+    if(i===1||i===4||i===7) { const g=document.createElement('span'); g.className='gap'; row.appendChild(g); }
+    const b = document.createElement('span');
+    b.className = 'char-box '+CLASSES[i]+(ch==='-'?' dash':'')+(activeChar===i?' active':'');
+    b.textContent = ch;
+    b.onclick = () => showTip(i, str);
+    row.appendChild(b);
+  });
+}
+function showTip(i, str) {
+  activeChar = i;
+  buildCharRow(str);
+  const t = TIPS[i];
+  document.getElementById('tip-box').style.borderLeftColor = t.color;
+  document.getElementById('tip-body').innerHTML = `<b style="color:${t.color};font-family:var(--mono)">${t.head}</b><br>${t.body}`;
+}
+
+/* ── BUILDER ── */
+function getChecked() {
+  const b = id => document.getElementById(id).checked;
+  return {
+    ur:b('ur'),uw:b('uw'),ux:b('ux'),
+    gr:b('gr'),gw:b('gw'),gx:b('gx'),
+    or:b('or'),ow:b('ow'),ox:b('ox'),
+  };
+}
+function bitsToStr(r,w,x) { return (r?'r':'-')+(w?'w':'-')+(x?'x':'-'); }
+function bitsToOct(r,w,x) { return (r?4:0)+(w?2:0)+(x?1:0); }
+
+function buildPerm() {
+  const c = getChecked();
+  const u = bitsToStr(c.ur,c.uw,c.ux);
+  const g = bitsToStr(c.gr,c.gw,c.gx);
+  const o = bitsToStr(c.or,c.ow,c.ox);
+  const s = '-'+u+g+o;
+  const oct = ''+bitsToOct(c.ur,c.uw,c.ux)+bitsToOct(c.gr,c.gw,c.gx)+bitsToOct(c.or,c.ow,c.ox);
+  document.getElementById('b-str').textContent = s;
+  document.getElementById('b-cmd').textContent = 'chmod '+oct+' <file>';
+  buildCharRow(s);
+  updateCheckedUI();
+}
+
+function updateCheckedUI() {
+  document.querySelectorAll('.chk-label input[type=checkbox]').forEach(inp => {
+    const box = inp.nextElementSibling;
+    box.textContent = inp.checked ? '✓' : '';
+  });
+}
+
+/* ── EXAMPLES TABLE ── */
+function buildExamples() {
+  const tbody = document.getElementById('ex-body');
+  tbody.innerHTML = EXAMPLES.map(e => `
+    <tr>
+      <td class="mono-cell">${colorPerm(e.p)}</td>
+      <td class="oct-cell">${e.oct}</td>
+      <td class="desc-cell">${e.desc}</td>
+      <td><span class="tag ${e.tag}">${e.tl}</span></td>
+      <td><button class="load-btn" onclick="loadExample('${e.p}')">↑ load</button></td>
+    </tr>
+  `).join('');
+}
+
+function colorPerm(s) {
+  return s.split('').map((c,i) => {
+    let col = '';
+    if(i===0) col='#A78BFA';
+    else if(i<=3) col='var(--cyan)';
+    else if(i<=6) col='var(--green)';
+    else col='var(--amber)';
+    const op = c==='-' ? ' opacity:.35' : '';
+    return `<span style="color:${col};${op};font-family:var(--mono)">${c}</span>`;
+  }).join('');
+}
+
+function loadExample(str) {
+  const pm = str.slice(1);
+  const map = {ur:pm[0]==='r',uw:pm[1]==='w',ux:pm[2]==='x',gr:pm[3]==='r',gw:pm[4]==='w',gx:pm[5]==='x',or:pm[6]==='r',ow:pm[7]==='w',ox:pm[8]==='x'};
+  Object.keys(map).forEach(k => { document.getElementById(k).checked=map[k]; });
+  switchTab('builder', document.querySelector('.tab-btn'));
+  buildPerm();
+}
+
+/* ── CHEATSHEET ── */
+function buildCheat() {
+  document.getElementById('cheat-grid').innerHTML = CHEAT.map(c => `
+    <div class="cheat-card">
+      <div class="cc-val">${c.v}</div>
+      <div class="cc-name">${c.n}</div>
+      <div class="cc-desc">${c.d}</div>
+    </div>
+  `).join('');
+}
+
+/* ── TABS ── */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    if(['builder','examples','cheat'][i]===name) b.classList.add('active');
+  });
+  document.getElementById('tp-'+name).classList.add('active');
+}
+
+/* ── OCTAL ── */
+function octalBits(n) { return [(n&4)?'r':'-',(n&2)?'w':'-',(n&1)?'x':'-'].join(''); }
+function octalSum(n) {
+  const p = []; if(n&4)p.push('4'); if(n&2)p.push('2'); if(n&1)p.push('1');
+  return p.length ? p.join('+') : '0';
+}
+function calcOctal() {
+  const v1=Math.min(7,Math.max(0,parseInt(document.getElementById('n1').value)||0));
+  const v2=Math.min(7,Math.max(0,parseInt(document.getElementById('n2').value)||0));
+  const v3=Math.min(7,Math.max(0,parseInt(document.getElementById('n3').value)||0));
+  ['1','2','3'].forEach((n,i)=>{
+    const v=[v1,v2,v3][i];
+    document.getElementById('ob'+n).textContent=octalBits(v);
+    document.getElementById('os'+n).textContent=octalSum(v);
+  });
+  const s='-'+octalBits(v1)+octalBits(v2)+octalBits(v3);
+  const oct=''+v1+v2+v3;
+  document.getElementById('oct-num').textContent=oct;
+  document.getElementById('oct-str').textContent=s;
+  document.getElementById('oct-cmd').textContent='chmod '+oct+' <file>';
+}
+
+/* ── COPY ── */
+function copyCmd() {
+  const t = document.getElementById('b-cmd').textContent.replace('<file>','filename');
+  navigator.clipboard?.writeText(t);
+  const b = document.querySelector('.builder-result .copy-btn');
+  const orig = b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=orig,1200);
+}
+function copyOctal() {
+  const t = document.getElementById('oct-cmd').textContent.replace('<file>','filename');
+  navigator.clipboard?.writeText(t);
+  const b = document.querySelector('.octal-result-row .copy-btn');
+  const orig = b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=orig,1200);
+}
+
+/* ── INIT ── */
+buildCharRow(PERM_DEFAULT);
+buildExamples();
+buildCheat();
+buildPerm();
+calcOctal();
+typewriterAnimate();
+</script>
+</body>
+</html>
